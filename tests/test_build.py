@@ -14,6 +14,8 @@ class BuildTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         shutil.copytree(ROOT / "web", self.root / "web")
+        shutil.copytree(ROOT / "data", self.root / "data")
+        shutil.copytree(ROOT / "archive", self.root / "archive")
         shutil.copyfile(ROOT / "tool.json", self.root / "tool.json")
         shutil.copyfile(ROOT / "README.md", self.root / "README.md")
 

@@ -1,16 +1,22 @@
 {
-  "id": "coolcode-tool-template",
-  "title": "CoolCode Tool Starter",
-  "description": "A browser-only example that trims lines and removes exact duplicates.",
+  "id": "scanreceipt",
+  "title": "Scan Receipt",
+  "description": "A dated receipt for what a website loaded.",
   "category": "security",
-  "tags": ["text", "lines", "duplicates"],
+  "tags": [
+    "urlscan",
+    "web privacy",
+    "network requests",
+    "evidence"
+  ],
   "icon": "scan-search",
-  "url": "/coolcode-tool-template/",
-  "source": "https://github.com/jsdyer/coolcode-tool-template",
+  "url": "/scanreceipt/",
+  "source": "https://github.com/jsdyer/scanreceipt",
   "hosting": "project",
   "access": "browser",
   "data_info": {
-    "mode": "local",
-    "detail": "The browser reads the text you paste and compares its lines."
+    "mode": "mixed",
+    "detail": "Existing urlscan.io results for an explicit owned-site list, plus local JSON evidence imports. No new scans are submitted.",
+    "cadence": "Daily"
   }
 }

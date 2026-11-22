@@ -1,116 +1,50 @@
-# CoolCode browser tool template
+# Scan Receipt
 
-A starting point for independent tools at `coolcode.ca/<repo>/`: a working local-text
-example, responsive UI, Python standard-library build, Node tests, PR checks and Pages
-publication. No npm install is needed.
-
-## Using the example
+A dated receipt for what a website loaded. Open https://coolcode.ca/scanreceipt/.
 
 <!-- coolcode:guide -->
-The first occurrence of each trimmed line keeps its place. Compare the output with the original text before copying the result.
+Open an existing public urlscan result, copy its full Result API JSON into the local workbench, then save a sanitized receipt. Import two receipts to compare destination hosts, requests and statuses. Scan time is distinct from collection time; a changed request does not prove tracking or removal.
 <!-- /coolcode:guide -->
 
-For a real tool, replace this paragraph with one or two plain-text sentences
-about an example, a limit or how to interpret the results. Keep the source,
-coverage, refresh behaviour and a worked example in this README as appropriate.
-When updating a tool, revise any details its behaviour has changed and keep the
-homepage's shorter data-source sentence in `tool.json` accurate.
-The hub imports the marked note into the catalogue README.
+## Useful without a key
 
-## One-time template setup
+1. Paste an existing urlscan UUID or result link into the link helper. It builds report and Result API links locally; opening them contacts urlscan.io.
+2. Paste a **full public Result API response** (`task`, `page`, `data.requests`) or open its JSON file. Search API summaries are not full evidence and are rejected with a clear message.
+3. Inspect dated submitted/final URLs, redirect responses, hosting ASN/country, resource types, status codes and destination hosts. Search within network requests. URLs are defanged; they are never visited by the app.
+4. Save a sanitized receipt JSON to retain it, or export network rows as CSV. Import that JSON later to reopen it. Add a second dated scan and compare domains, request URLs/statuses and redirect counts.
 
-Enable **Settings → General → Template repository** here. This repository does not
-need Pages enabled: its workflow builds/tests but intentionally skips deployment.
-New copies also skip deployment until `scripts/init.py` sets the tool ID to match
-their repository name. This lets you create the repo before configuring Pages.
+Public visibility is required explicitly; unlisted/private results are rejected. Maximum 15 MB per import, 20,000 requests per scan and 100 receipts in the desk. Repeated scan IDs replace the existing local copy. Source screenshots and reports are source-linked, never embedded or loaded automatically. The screenshot itself is not retained by this application and may become unavailable upstream. Request displays show the first 200 filtered rows; exports include all imported rows. No browser scan or remote page execution occurs. **This app never calls the scan-submission API.**
 
-## Start a new tool
+## Scheduled coverage and provider permission
 
-1. Select **Use this template → Create a new repository**, choose owner `jsdyer`,
-   a unique lowercase name such as `my-tool`, and public visibility.
-2. Clone the new repository. Use Python 3.12+ and Node 24+.
-3. Set the identity, using a slug that matches the repository name:
+The collector only searches existing public scans for the explicit `config.json` owned-domain allowlist (`coolcode.ca`, `jsdyer.github.io` initially). It makes two daily searches, each limited to the last 30 days and five results. A `URLSCAN_API_KEY` repository secret is sent only through the `API-Key` header. Anonymous searches can work at lower quotas; adding a key is separate from republication permission. API rate limits depend on the account and operation, with minute/hour/day windows; bounded backoff honors Retry-After and X-Rate-Limit-Reset-After. A zero response means no observations returned in that selected window, not no historical scans.
 
-```sh
-python3 scripts/init.py my-tool --title "My Tool" --description "Describe what this tool does."
-```
+urlscan's terms restrict systematic database compilation and public republication; its API guidance prohibits wholesale mirroring. Therefore **public receipt republication is disabled by default** (`publish_receipts: false`). The initial scheduled archive contains real search coverage/status observations, not copied scan datasets. Local receipt imports and explicit downloads remain fully usable. To enable a narrow owned-site public archive, first document provider permission in `permission_note`, then change the setting. Merely adding an API key does not enable republication. Configured `existing_public_scan_ids` are validated UUIDs and still require public visibility and owned submitted hostname; the collector never retrieves arbitrary targets. At most 12 permitted receipts are fetched in one run. No screenshots, raw HTML, DOM, scripts or response bodies are downloaded.
 
-Review the category, tags and icon in `tool.json`. `access: "browser"` tells the main
-catalogue that the tool works immediately without installation. `--owner` supports a different
-GitHub owner, but only projects owned by `jsdyer` inherit the CoolCode domain.
+Primary documentation and policy verified 2026-11-22:
 
-4. Replace the example in `web/` and its tests. Update the privacy explanation,
-   source attribution and README to describe the real tool.
-5. Test and preview:
+- https://docs.urlscan.io/apis/urlscan-openapi/search/searchdatasource
+- https://docs.urlscan.io/apis/urlscan-openapi/scanning/getresult
+- https://docs.urlscan.io/pages/api-rate-limits
+- https://docs.urlscan.io/pages/api-best-practices
+- https://docs.urlscan.io/pages/faq
+- https://urlscan.io/terms/
+
+## Privacy and interpretation
+
+Imports, searching, sanitizing and comparison run locally, in tab memory; no pasted JSON is uploaded or saved automatically. Reload/Clear discards it unless you have chosen Save receipts JSON. Queries, fragments, URL credentials, headers, cookies and request bodies are excluded. Paths and page titles can still contain sensitive content; review before sharing. Source links contact urlscan.io only when opened. The site loads its own saved metadata and the aggregate CoolCode open counter; inputs/filter values are excluded from metrics. Keys never enter client code, logs or retained artifacts.
+
+A scan measures a particular browser, time and location. Consent defaults, timing, network conditions and dynamic content can change results. A destination host does not establish separate ownership, tracking, illegality or a relationship between organizations. Hosting country is not data residency. Redirect evidence reflects redirect responses actually supplied; a differing submitted/final URL alone is not reconstructed into an invented chain. Related tools: Tracker X-Ray and PhishIntel.
+
+## Archive and checks
+
+Schedule: **daily at 14:47 UTC** (`47 14 * * *`), best effort. Scheduled/manual runs refresh, validate, test, retain and deploy. Pushes build saved data offline except an absent baseline or pending-credential manifest. `data/index.json` is small hub metadata. `data/current.json` holds permitted normalized receipts (none by default) and actual coverage checks. `data/history.json` indexes immutable SHA-256-validated snapshots in `archive/YYYY-MM/`. Identical observations do not manufacture changes; the first is explicitly a baseline. Snapshot links download these metadata observations. Provider scan time, capture time and most recent check time remain distinct. Failed responses or validation preserve the previous good deployment.
 
 ```sh
 node --test tests/*.test.mjs
 python3 -m unittest discover -s tests -v
-python3 scripts/build.py
-python3 -m http.server 8000 --directory dist
+python3 scripts/build.py        # offline
+python3 scripts/collect.py      # explicit existing-result lookup only
 ```
 
-Open `http://localhost:8000/`. The example trims lines, skips blanks and removes exact
-duplicates, preserving first-seen order and capitalization. It processes the text in tab memory. Update that explanation if your app behaves differently.
-
-CI also tests the browser flow and mobile layout at a project subpath. Replace the
-sample assertions in `tests/browser_smoke.py` when implementing your own UI. To run
-that check locally (optional for ordinary preview):
-
-```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install -r tests/browser-requirements.txt
-python3 -m playwright install --with-deps chromium
-python3 tests/browser_smoke.py
-```
-
-Playwright is a test-only dependency; the app and its static build do not use it.
-
-## Publish and register
-
-When the actual tool is ready, in the **new tool repository** set **Settings → Pages → Build and deployment →
-Source → GitHub Actions**. Push to `main`, or manually run **Browser tool · Check and
-publish** after enabling Pages. If the initial deployment ran before Pages was enabled,
-enable it and rerun. PRs only check/build and provide a downloadable preview artifact.
-
-Keep `{{VISIT_COUNTER}}` in the page head and `{{ISSUE_LINK}}` in the footer when replacing the starter UI. The build enables these for initialized CoolCode repositories. The shared counter records aggregate opens on coolcode.ca by public tool ID. Toolbox inputs and URL parameters are excluded. The issue link opens a reporting form with the tool already selected.
-
-Keep app-owned asset paths and module imports relative. Check `https://coolcode.ca/my-tool/`.
-Do not add a CNAME or set `coolcode.ca` as this project's custom domain; the account
-site supplies it. Only successful `main` builds deploy.
-
-After verifying the app, copy the reviewed object from `tool.json` into `data/tools.json`
-in [the main site](https://github.com/jsdyer/jsdyer.github.io). Each tool still builds
-independently. Update the hub record when listing metadata changes; the hub is the
-authority for discovery. Ordinary app updates touch only this repository.
-
-The main site separates **Use in your browser** from **Install yourself**. An app
-that asks for a file is still a browser tool. Standalone Linux packages should start
-in their own repositories with their own build/release workflow, rather than copying
-this browser-only scaffold. Their hub record uses `access: "install"`, links to an
-installation guide, and includes `requirements`.
-
-## Files
-
-| Path | Purpose |
-| --- | --- |
-| `tool.json` | Page metadata and a ready-to-copy catalogue record |
-| `web/` | HTML, responsive CSS, DOM interactions and separate model logic |
-| `scripts/build.py` | Escape metadata and build `web/` into `dist/` |
-| `scripts/init.py` | Set a new project's identity |
-| `tests/` | Application and builder tests |
-| `.github/workflows/pages.yml` | Check PRs and publish successful main builds |
-| `AGENTS.md` | Instructions for future coding work |
-
-Namespace optional storage as `coolcode:<tool-id>:<key>`; CoolCode paths share a
-browser origin. Don't save pasted text/uploads by default. Document external APIs
-and send only the information needed for the selected action. Never embed secrets.
-
-Scheduled refresh is opt-in. Validate source data before deploying, display its date,
-and preserve the last good deployment on failure. Public-repository schedules can
-stop after 60 days without repository activity.
-
-Templates don't propagate future edits automatically. Adopt fixes explicitly and
-consider a versioned reusable workflow once several tools confirm the shared process.
-Choose and add the intended software license before distributing a new project.
+Standard-library Python; no runtime dependencies. CI Playwright checks full JSON import, comparison, source-link safety, export, invalid/private input rejection and mobile layout. Browser automation is a CI-only test dependency. Code is MIT licensed; upstream data is subject to urlscan's terms, not relicensed.

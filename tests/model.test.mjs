@@ -1,21 +1,7 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { cleanLines } from '../web/model.mjs';
-test('trims, removes blanks and preserves first-seen order', () => {
-  assert.deepEqual(cleanLines('  Halifax\nLangley\nHalifax\n\nVancouver  '), {
-    text: 'Halifax\nLangley\nVancouver', count: 3, removed: 1,
-  });
-});
-test('supports Windows and old Mac line endings', () => {
-  assert.equal(cleanLines('a\r\nb\ra').text, 'a\nb');
-});
-test('empty text and whitespace produce an empty result', () => {
-  assert.deepEqual(cleanLines(' \n\t'), { text: '', count: 0, removed: 0 });
-});
-test('preserves case and Unicode', () => {
-  assert.equal(cleanLines('Québec\nquébec\n東京\nQuébec').text, 'Québec\nquébec\n東京');
-});
-test('treats markup as ordinary text', () => {
-  assert.equal(cleanLines('<script>alert(1)</script>\n<script>alert(1)</script>').text, '<script>alert(1)</script>');
-});
-test('rejects non-text input', () => { assert.throws(() => cleanLines(null), TypeError); });
+import test from 'node:test';import assert from 'node:assert/strict';import {parseImport,compare,safeUrl,scanId,csv} from '../web/model.mjs';
+const id='11111111-1111-4111-8111-111111111111';
+function source(){return {task:{uuid:id,visibility:'public',url:'https://a.example/?email=person@example.net',time:'2026-01-02T10:00:00Z'},page:{url:'https://b.example/',domain:'b.example',title:'<img src=x>',asn:'AS123'},data:{requests:[{request:{type:'Document',request:{url:'https://u:p@b.example/page?token=secret#private',method:'GET'},redirectResponse:{url:'http://a.example',status:301}},response:{response:{status:200,mimeType:'text/html',remoteIPAddress:'192.0.2.1'}}}]}};}
+test('receipt strips cookies, headers, bodies, query values and credentials',()=>{const raw=source();raw.data.cookies=[{value:'secret-cookie'}];raw.data.requests[0].request.request.postData='secret-body';const [r]=parseImport(raw);assert.equal(r.requests.length,1);assert.equal(r.redirects[0].status,301);assert.equal(r.final_url,'https://b.example/');assert.equal(r.requests[0].url,'https://b.example/page?[values removed]');assert.equal(r.requests[0].status,200);assert.equal(r.screenshot_url,'https://urlscan.io/screenshots/'+id+'.png');assert(!JSON.stringify(r).includes('secret'));assert.equal(r.title,'<img src=x>');});
+test('rejects nonpublic, malformed and search results',()=>{const x=source();x.task.visibility='unlisted';assert.throws(()=>parseImport(x),/public/);delete x.task.uuid;assert.throws(()=>parseImport(x),/uuid/);assert.throws(()=>parseImport({results:[]}),/uuid/);});
+test('sanitized export round-trip and domain/status comparison',()=>{const [a]=parseImport(source());const b=structuredClone(a);b.id='22222222-2222-4222-8222-222222222222';b.requests[0].url='https://cdn.example/x';b.requests[0].status=404;b.domains=['cdn.example'];const d=compare(a,b);assert.deepEqual(d.domains.added,['cdn.example']);assert.deepEqual(d.domains.removed,['b.example']);assert.equal(d.requests.added.length,1);assert.deepEqual(parseImport({receipt_schema:1,receipts:[a]}),[a]);});
+test('safe provider links and CSV formula mitigation',()=>{assert.equal(scanId('https://urlscan.io/result/'+id+'/'),id);assert.throws(()=>scanId('https://evil.example/result/'+id));assert.equal(safeUrl('javascript:alert(1)'),'Unavailable');assert.match(csv([{domain:'=SUM(A1)',url:'https://a.example/',method:'GET'}]),/'=SUM/);});

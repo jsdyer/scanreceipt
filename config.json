@@ -1,0 +1,11 @@
+{
+  "owned_domains": [
+    "coolcode.ca",
+    "jsdyer.github.io"
+  ],
+  "existing_public_scan_ids": [],
+  "publish_receipts": false,
+  "permission_note": "",
+  "maximum_results_per_domain": 5,
+  "search_days": 30
+}
