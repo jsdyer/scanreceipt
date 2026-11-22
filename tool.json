@@ -16,7 +16,7 @@
   "access": "browser",
   "data_info": {
     "mode": "mixed",
-    "detail": "Existing urlscan.io results for an explicit owned-site list, plus local JSON evidence imports. No new scans are submitted.",
+    "detail": "Daily owned-domain urlscan search status plus local evidence imports and comparisons; no new scans or public receipt republication.",
     "cadence": "Daily"
   }
 }
