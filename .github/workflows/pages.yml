@@ -1,9 +1,14 @@
-name: Data · Collect, check and publish
+name: Receipts · Capture and publish
 on:
   pull_request:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      capture_url:
+        description: Optional owned HTTPS page to save publicly; blank captures the daily set
+        type: string
+        default: ''
   schedule:
     - cron: '47 14 * * *'
 permissions:
@@ -50,7 +55,9 @@ jobs:
         run: if [ -n "$HC" ]; then curl -fsS --retry 2 --max-time 15 "$HC/start" >/dev/null || true; fi
       - name: Capture our public pages directly
         if: steps.mode.outputs.collect == 'true'
-        run: python3 scripts/collect.py
+        env:
+          CAPTURE_URL: ${{ inputs.capture_url }}
+        run: python3 scripts/collect.py --target "$CAPTURE_URL"
       - name: Test analytical models and source parsers
         run: |
           node --test tests/*.test.mjs

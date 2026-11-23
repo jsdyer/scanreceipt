@@ -1,12 +1,12 @@
 """Owner-run API client: submit one allowlisted URL and return provider links only."""
 import argparse,json,os,re,time,urllib.request,urllib.error
 from pathlib import Path
+from targets import settings,target_url
 ROOT=Path(__file__).resolve().parents[1]
 UUID=re.compile(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$',re.I)
 
 def allowed_target(value,config):
-    if value not in config['urlscan_targets']: raise ValueError('Target is not an owner-authorized public homepage')
-    return value
+    return target_url(value,config)
 
 def call(path,key,payload=None):
     body=json.dumps(payload).encode() if payload is not None else None
@@ -20,10 +20,10 @@ def call(path,key,payload=None):
     except (OSError,ValueError): raise RuntimeError('Provider response unavailable. Check your urlscan account before submitting again.') from None
 
 def run(target):
-    target=allowed_target(target,json.loads((ROOT/'config.json').read_text()))
+    target=allowed_target(target,settings(ROOT))
     key=os.environ.get('URLSCAN_API_KEY','').strip()
     if not key: raise ValueError('Set the URLSCAN_API_KEY environment variable / repository secret')
-    print('Submitting one public scan of the owner-authorized homepage. URL and results will be public on urlscan.io.')
+    print('Submitting one public scan of the owner-authorized page. URL and results will be public on urlscan.io.')
     response=call('/api/v1/scan/',key,{'url':target,'visibility':'public'})
     sid=response.get('uuid','')
     if not UUID.fullmatch(sid): raise ValueError('Provider did not return a valid scan ID')

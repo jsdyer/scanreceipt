@@ -16,7 +16,7 @@
   "access": "browser",
   "data_info": {
     "mode": "mixed",
-    "detail": "Daily first-party Chromium captures of three CoolCode pages, plus local urlscan imports and an owner-only API scan workflow.",
+    "detail": "Daily browser captures, owner-selected public receipts and urlscan workflows for twelve owned sites; provider imports stay local.",
     "cadence": "Daily"
   }
 }

@@ -58,4 +58,7 @@ def assemble(root,stage):
         if hashlib.sha256((root/file).read_bytes()).hexdigest()!=entry['sha256']:raise ValueError('Archive checksum mismatch')
         validate(json.loads((root/file).read_text()))
     shutil.copytree(root/'data',stage/'data');shutil.copytree(root/'archive',stage/'archive')
+    if (root/'config.json').exists():
+        from targets import settings
+        (stage/'data/settings.json').write_text(json.dumps(settings(root),indent=2)+'\n')
     if (root/'evidence').exists(): shutil.copytree(root/'evidence',stage/'evidence')

@@ -1,17 +1,31 @@
-name: Personal urlscan · Scan an owned homepage
+name: Personal urlscan · Scan an owned page
 on:
   workflow_dispatch:
     inputs:
       target:
-        description: Public owner-authorized homepage (the scan is public at urlscan.io)
+        description: Public owner-authorized page (the scan is public at urlscan.io)
         type: choice
         options:
           - https://coolcode.ca/
           - https://jsdyer.github.io/
+          - https://liminalhacker.com/
+          - https://slashaccess.com/
+          - https://jsdtechnologies.ca/
+          - https://jsd.technology/
+          - https://jeffreydyer.ca/
+          - https://nethush.com/
+          - https://interweb.international/
+          - https://funapps.ca/
+          - https://hackme.ca/
+          - https://superapp.ca/
+          - https://coolcode.ca/rackexpiry/
+          - https://coolcode.ca/radarscope/
+          - https://coolcode.ca/hotspotledger/
         default: https://coolcode.ca/
-  push:
-    branches: [main]
-    paths: ['.github/workflows/urlscan-check.yml']
+      custom_url:
+        description: Optional HTTPS page on an owned configured site; overrides the selection
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -31,5 +45,5 @@ jobs:
       - name: Submit one public scan and return provider links
         env:
           URLSCAN_API_KEY: ${{ secrets.URLSCAN_API_KEY }}
-          TARGET: ${{ inputs.target || 'https://coolcode.ca/' }}
+          TARGET: ${{ inputs.custom_url || inputs.target || 'https://coolcode.ca/' }}
         run: python3 scripts/urlscan_check.py --target "$TARGET"

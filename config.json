@@ -4,5 +4,35 @@
     "https://coolcode.ca/radarscope/",
     "https://coolcode.ca/hotspotledger/"
   ],
-  "urlscan_targets": ["https://coolcode.ca/", "https://jsdyer.github.io/"]
+  "urlscan_targets": [
+    "https://coolcode.ca/",
+    "https://jsdyer.github.io/",
+    "https://liminalhacker.com/",
+    "https://slashaccess.com/",
+    "https://jsdtechnologies.ca/",
+    "https://jsd.technology/",
+    "https://jeffreydyer.ca/",
+    "https://nethush.com/",
+    "https://interweb.international/",
+    "https://funapps.ca/",
+    "https://hackme.ca/",
+    "https://superapp.ca/",
+    "https://coolcode.ca/rackexpiry/",
+    "https://coolcode.ca/radarscope/",
+    "https://coolcode.ca/hotspotledger/"
+  ],
+  "owned_hosts": [
+    "coolcode.ca",
+    "jsdyer.github.io",
+    "liminalhacker.com",
+    "slashaccess.com",
+    "jsdtechnologies.ca",
+    "jsd.technology",
+    "jeffreydyer.ca",
+    "nethush.com",
+    "interweb.international",
+    "funapps.ca",
+    "hackme.ca",
+    "superapp.ca"
+  ]
 }

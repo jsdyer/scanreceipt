@@ -9,7 +9,10 @@ class PersonalTests(unittest.TestCase):
   self.assertEqual(target_url('https://coolcode.ca/rackexpiry/'),'https://coolcode.ca/rackexpiry/')
   for value in ['http://coolcode.ca/','https://evil.example/','https://coolcode.ca/?token=x','https://user:pass@coolcode.ca/','https://coolcode.ca:444/']:
    with self.assertRaises(ValueError):target_url(value)
-  with self.assertRaises(ValueError):urlscan_check.allowed_target('https://coolcode.ca/secret',{'urlscan_targets':['https://coolcode.ca/']})
+  with self.assertRaises(ValueError):urlscan_check.allowed_target('https://evil.example/',{'owned_hosts':['coolcode.ca']})
+  self.assertEqual(urlscan_check.allowed_target('https://hackme.ca/tools/',{'owned_hosts':['hackme.ca']}),'https://hackme.ca/tools/')
+  for value in ['https://hackme.ca.evil.example/','https://hackme.ca/?token=x','https://localhost/','https://127.0.0.1/']:
+   with self.assertRaises(ValueError):urlscan_check.allowed_target(value,{'owned_hosts':['hackme.ca']})
  def test_one_submission_and_provider_links_without_saved_report(self):
   sid='12345678-1234-4234-8234-123456789abc'
   with tempfile.TemporaryDirectory() as d:

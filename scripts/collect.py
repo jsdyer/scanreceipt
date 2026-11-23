@@ -1,26 +1,15 @@
 """Capture our public pages ourselves; no provider database is copied."""
-import json
+import argparse,json
 import uuid
 from urllib.parse import urlsplit
 from archive import ROOT, now, save
 from urlscan_import import normalize, safe_url
+from targets import settings, target_url, host_allowed
 
-OWNED = {'coolcode.ca', 'jsdyer.github.io'}
-
-def target_url(value):
-    u = urlsplit(value)
-    if (u.scheme != 'https' or u.hostname not in OWNED or u.port not in (None,443)
-            or u.username or u.password or u.query or u.fragment):
-        raise ValueError('Use an allowlisted public HTTPS page without credentials or query strings')
-    return value
-
-def run(root=ROOT):
+def run(root=ROOT,target=None):
     from playwright.sync_api import sync_playwright
-    config = json.loads((root/'config.json').read_text())
-    urls = config['capture_urls']
-    if not 1 <= len(urls) <= 5 or len(set(urls)) != len(urls):
-        raise ValueError('Select one to five distinct owned pages')
-    for u in urls: target_url(u)
+    config = settings(root)
+    urls = [target_url(target,config)] if target else config['capture_urls']
     records = []
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -32,7 +21,7 @@ def run(root=ROOT):
                 q=r.request; u=urlsplit(q.url)
                 if q.method not in ('GET','HEAD') or u.scheme not in ('http','https') or u.path.endswith('/tool-metrics.js'):
                     r.abort(); return
-                if q.is_navigation_request() and q.frame == page.main_frame and u.hostname not in OWNED:
+                if q.is_navigation_request() and q.frame == page.main_frame and not host_allowed(u.hostname,config):
                     r.abort(); return
                 r.continue_()
             page.route('**/*', route)
@@ -50,7 +39,7 @@ def run(root=ROOT):
             result = page.goto(url, wait_until='networkidle', timeout=60000)
             if result is None or result.status >= 400: raise ValueError('Owned page could not be captured')
             page.wait_for_timeout(2000)
-            target_url(page.url)
+            target_url(page.url,config)
             height=page.evaluate('document.documentElement.scrollHeight')
             clipped=height>20000
             dest=root/'evidence'/f'{sid}.jpg';dest.parent.mkdir(exist_ok=True)
@@ -70,11 +59,12 @@ def run(root=ROOT):
     recent=[r for r in old.get('records',[]) if r.get('source')=='CoolCode Chromium']
     records=(records+recent)[:30]
     return save({'collector':'owned-chromium-v1','needs_credentials':False,'records':records,'status':'ready',
-        'coverage':'Daily browser captures of '+', '.join(urls)+'. Fresh desktop Chromium; no sign-in or consent interaction.',
-        'capture_urls':urls,'sources':[{'name':'CoolCode browser capture','url':'https://github.com/jsdyer/scanreceipt',
+        'coverage':('Manual browser capture of ' if target else 'Scheduled-set browser captures of ')+', '.join(urls)+'. Fresh desktop Chromium; no sign-in or consent interaction.',
+        'capture_urls':config['capture_urls'],'last_capture_urls':urls,'last_capture_kind':'manual' if target else 'scheduled set','sources':[{'name':'CoolCode browser capture','url':'https://github.com/jsdyer/scanreceipt',
             'status':'captured directly','detail':'Our own Chromium screenshots and network observations; independent of urlscan.'}],
         'warnings':[]},root)
 
 if __name__=='__main__':
-    try: run()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--target',default=None);args=parser.parse_args()
+    try: run(target=args.target or None)
     except Exception as e: raise SystemExit('Capture failed; previous deployment retained. '+str(e)) from None
