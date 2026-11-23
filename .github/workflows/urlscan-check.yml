@@ -1,0 +1,35 @@
+name: Personal urlscan · Scan an owned homepage
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Public owner-authorized homepage (the scan is public at urlscan.io)
+        type: choice
+        options:
+          - https://coolcode.ca/
+          - https://jsdyer.github.io/
+        default: https://coolcode.ca/
+  push:
+    branches: [main]
+    paths: ['.github/workflows/urlscan-check.yml']
+permissions:
+  contents: read
+concurrency:
+  group: owner-urlscan
+  cancel-in-progress: false
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Submit one public scan and return provider links
+        env:
+          URLSCAN_API_KEY: ${{ secrets.URLSCAN_API_KEY }}
+          TARGET: ${{ inputs.target || 'https://coolcode.ca/' }}
+        run: python3 scripts/urlscan_check.py --target "$TARGET"

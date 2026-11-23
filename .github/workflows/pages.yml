@@ -30,13 +30,17 @@ jobs:
           node-version: '24'
       - name: Install source parsers
         run: python3 -m pip install -r requirements.txt
+      - name: Install browser test dependencies
+        run: |
+          python3 -m pip install -r tests/browser-requirements.txt
+          python3 -m playwright install --with-deps chromium
       - name: Select collection mode
         id: mode
         env:
           EVENT: ${{ github.event_name }}
         run: |
           collect=false
-          if [ "$EVENT" != pull_request ] && { [ "$EVENT" = schedule ] || [ "$EVENT" = workflow_dispatch ] || [ ! -f data/current.json ] || python3 -c 'import json,sys; sys.exit(0 if json.load(open("data/current.json")).get("needs_credentials",False) else 1)'; }; then collect=true; fi
+          if [ "$EVENT" != pull_request ] && { [ "$EVENT" = schedule ] || [ "$EVENT" = workflow_dispatch ] || [ ! -f data/current.json ] || python3 -c 'import json,sys; sys.exit(0 if json.load(open("data/current.json")).get("collector")!="owned-chromium-v1" else 1)'; }; then collect=true; fi
           echo "collect=$collect" >> "$GITHUB_OUTPUT"
 
       - name: Monitor collection start
@@ -44,10 +48,8 @@ jobs:
         env:
           HC: ${{ secrets.HEALTHCHECKS_PING_URL }}
         run: if [ -n "$HC" ]; then curl -fsS --retry 2 --max-time 15 "$HC/start" >/dev/null || true; fi
-      - name: Collect public source evidence
+      - name: Capture our public pages directly
         if: steps.mode.outputs.collect == 'true'
-        env:
-          URLSCAN_API_KEY: ${{ secrets.URLSCAN_API_KEY }}
         run: python3 scripts/collect.py
       - name: Test analytical models and source parsers
         run: |
@@ -55,10 +57,6 @@ jobs:
           python3 -m unittest discover -s tests -v
       - name: Build saved data offline
         run: python3 scripts/build.py
-      - name: Install browser test dependencies
-        run: |
-          python3 -m pip install -r tests/browser-requirements.txt
-          python3 -m playwright install --with-deps chromium
       - name: Check desktop, mobile, filters, source details and CSV
         run: python3 tests/browser_smoke.py
       - name: Save full-page screenshots
@@ -73,7 +71,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git add data archive
+          git add data archive evidence
           if ! git diff --cached --quiet; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'

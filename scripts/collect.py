@@ -1,53 +1,80 @@
-"""Read existing public scans only. This module has no scan-submission API."""
-from archive import ROOT,save,request_json
-from urllib.parse import urlencode,urlsplit
-from collections import Counter
-import os,re,json
-UUID=re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
-def safe_url(value):
-    try:
-        x=urlsplit(value)
-        if x.scheme not in ['http','https'] or not x.hostname:return 'Unavailable'
-        return x.scheme+'://'+x.hostname+((':'+str(x.port)) if x.port else '')+(x.path or '/')+('?[values removed]' if x.query else '')
-    except (ValueError,TypeError):return 'Unavailable'
-def normalize(x,allowed=None):
-    task=x.get('task') or {};page=x.get('page') or {};sid=task.get('uuid','');url=task.get('url','');host=urlsplit(url).hostname
-    if not UUID.fullmatch(sid):raise ValueError('Invalid public scan ID')
-    if task.get('visibility')!='public':raise ValueError('Only explicitly public scans may be retained')
-    if allowed is not None and host not in allowed:raise ValueError('Scan URL outside owned-domain allowlist')
-    requests=[];redirects=[]
-    raw=(x.get('data') or {}).get('requests')
-    if not isinstance(raw,list):raise ValueError('Invalid requests array')
-    for item in raw[:2000]:
-        wrapper=item.get('request') or {};req=wrapper.get('request') or {};response=(item.get('response') or {}).get('response') or {};u=req.get('url') or response.get('url') or ''
-        status=response.get('status');record={'url':safe_url(u),'domain':urlsplit(u).hostname or 'Unknown','method':req.get('method','GET'),'type':wrapper.get('type') or item.get('type') or 'Unknown','status':status if isinstance(status,(int,float)) else None,'mime':response.get('mimeType',''),'ip':response.get('remoteIPAddress','')}
-        requests.append(record)
-        redirect=wrapper.get('redirectResponse') or item.get('redirectResponse')
-        if isinstance(redirect,dict):redirects.append({'from':safe_url(redirect.get('url','')),'to':safe_url(u),'status':redirect.get('status')})
-    return {'id':sid,'domain':page.get('domain') or host,'submitted_url':safe_url(url),'final_url':safe_url(page.get('url','')),'scanned_at':task.get('time',''),'visibility':'public','source':'urlscan.io','source_url':'https://urlscan.io/result/'+sid+'/','screenshot_url':'https://urlscan.io/screenshots/'+sid+'.png','title':str(page.get('title') or '')[:500],'country':page.get('country') or 'Not reported','asn':page.get('asn') or 'Not reported','asn_name':page.get('asnname') or 'Not reported','requests':requests,'request_count':len(raw),'requests_truncated':len(raw)>2000,'redirects':redirects,'domains':sorted(set(r['domain'] for r in requests)),'privacy':'Query values, fragments, credentials, headers, cookies and request bodies excluded.'}
-def run():
-    config=json.loads((ROOT/'config.json').read_text());allowed=config['owned_domains']
-    if not allowed or len(allowed)>5 or any(not re.fullmatch(r'[a-z0-9.-]+',d) for d in allowed):raise ValueError('Invalid owned-domain allowlist')
-    headers={'API-Key':os.environ['URLSCAN_API_KEY']} if os.getenv('URLSCAN_API_KEY') else {}
-    checks=[];candidates={};receipts=[]
-    for domain in allowed:
-        q='domain:'+domain+' AND task.visibility:public AND date:>now-'+str(min(30,int(config.get('search_days',30))))+'d'
-        data=request_json('https://urlscan.io/api/v1/search/?'+urlencode({'q':q,'size':min(5,int(config.get('maximum_results_per_domain',5)))}),headers)
-        if not isinstance(data.get('results'),list):raise ValueError('Invalid search response')
-        checks.append({'domain':domain,'matching_results':data.get('total'),'returned_results':len(data['results']),'history_limit_days':data.get('search_date_limit_days'),'window_days':min(30,int(config.get('search_days',30)))})
-        for r in data['results']:
-            sid=r.get('_id') or (r.get('task') or {}).get('uuid','')
-            if UUID.fullmatch(sid):candidates[sid]=True
-    if config.get('publish_receipts'):
-        if not config.get('permission_note','').strip():raise ValueError('Document public-republication permission')
-        for sid in config.get('existing_public_scan_ids',[]):
-            if not UUID.fullmatch(sid):raise ValueError('Invalid manual scan ID')
-            candidates[sid]=True
-        for sid in list(candidates)[:12]:receipts.append(normalize(request_json('https://urlscan.io/api/v1/result/'+sid+'/',headers),allowed))
-    warnings=['No new scan is submitted. Existing public results only. Search history depends on the account tier.']
-    if not config.get('publish_receipts'):warnings.append('Public receipt republication is disabled pending provider permission. Import an existing result JSON locally to inspect and save a sanitized receipt.')
-    if not any(c['returned_results'] for c in checks):warnings.append('No existing public scans were returned for the selected owned domains and search window. This does not mean the sites have never been scanned.')
-    return save({'needs_credentials':not bool(os.getenv('URLSCAN_API_KEY')),'records':receipts,'search_checks':checks,'sources':[{'name':'urlscan.io','url':'https://docs.urlscan.io/','status':'search checked','policy':'https://urlscan.io/terms/','detail':'Existing public search only; no submission endpoint.'}],'status':'ready' if receipts else 'import ready','coverage':'Owned domains: '+', '.join(allowed)+'. Last 30 days; at most 5 results per domain. Public receipts require documented provider permission.','warnings':warnings,'policy_checked':'2026-11-22','publication_enabled':bool(config.get('publish_receipts'))})
+"""Capture our public pages ourselves; no provider database is copied."""
+import json
+import uuid
+from urllib.parse import urlsplit
+from archive import ROOT, now, save
+from urlscan_import import normalize, safe_url
+
+OWNED = {'coolcode.ca', 'jsdyer.github.io'}
+
+def target_url(value):
+    u = urlsplit(value)
+    if (u.scheme != 'https' or u.hostname not in OWNED or u.port not in (None,443)
+            or u.username or u.password or u.query or u.fragment):
+        raise ValueError('Use an allowlisted public HTTPS page without credentials or query strings')
+    return value
+
+def run(root=ROOT):
+    from playwright.sync_api import sync_playwright
+    config = json.loads((root/'config.json').read_text())
+    urls = config['capture_urls']
+    if not 1 <= len(urls) <= 5 or len(set(urls)) != len(urls):
+        raise ValueError('Select one to five distinct owned pages')
+    for u in urls: target_url(u)
+    records = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        for url in urls:
+            stamp, sid = now(), str(uuid.uuid4())
+            context = browser.new_context(viewport={'width':1280,'height':900}, locale='en-CA', timezone_id='UTC', service_workers='block')
+            page = context.new_page()
+            def route(r):
+                q=r.request; u=urlsplit(q.url)
+                if q.method not in ('GET','HEAD') or u.scheme not in ('http','https') or u.path.endswith('/tool-metrics.js'):
+                    r.abort(); return
+                if q.is_navigation_request() and q.frame == page.main_frame and u.hostname not in OWNED:
+                    r.abort(); return
+                r.continue_()
+            page.route('**/*', route)
+            requests, redirects = [], []
+            def response(r):
+                q=r.request
+                if len(requests) >= 2000: return
+                requests.append({'url':safe_url(q.url),'domain':urlsplit(q.url).hostname or 'Unknown',
+                    'method':q.method,'type':q.resource_type,'status':r.status,'mime':r.headers.get('content-type',''),'ip':''})
+                prior=q.redirected_from
+                if prior:
+                    previous=prior.response()
+                    redirects.append({'from':safe_url(prior.url),'to':safe_url(q.url),'status':previous.status if previous else None})
+            page.on('response', response)
+            result = page.goto(url, wait_until='networkidle', timeout=60000)
+            if result is None or result.status >= 400: raise ValueError('Owned page could not be captured')
+            page.wait_for_timeout(2000)
+            target_url(page.url)
+            height=page.evaluate('document.documentElement.scrollHeight')
+            clipped=height>20000
+            dest=root/'evidence'/f'{sid}.jpg';dest.parent.mkdir(exist_ok=True)
+            if clipped: page.screenshot(path=str(dest),type='jpeg',quality=65,clip={'x':0,'y':0,'width':1280,'height':20000})
+            else: page.screenshot(path=str(dest),type='jpeg',quality=65,full_page=True)
+            records.append({'id':sid,'domain':urlsplit(page.url).hostname,'submitted_url':url,'final_url':safe_url(page.url),
+                'scanned_at':stamp,'visibility':'public','source':'CoolCode Chromium','source_url':url,
+                'screenshot_url':f'https://coolcode.ca/scanreceipt/evidence/{sid}.jpg','title':page.title(),
+                'country':'Runner location not inferred','asn':'Not measured','asn_name':'Not measured',
+                'requests':requests,'request_count':len(requests),'requests_truncated':len(requests)>=2000,
+                'redirects':redirects,'domains':sorted({r['domain'] for r in requests}),
+                'viewport':{'width':1280,'height':900},'screenshot_clipped':clipped,'browser_version':browser.version,
+                'privacy':'Fresh unsigned-in browser; POST requests and metrics blocked; no headers, cookies or bodies retained.'})
+            context.close()
+        browser.close()
+    old=json.loads((root/'data/current.json').read_text()) if (root/'data/current.json').exists() else {}
+    recent=[r for r in old.get('records',[]) if r.get('source')=='CoolCode Chromium']
+    records=(records+recent)[:30]
+    return save({'collector':'owned-chromium-v1','needs_credentials':False,'records':records,'status':'ready',
+        'coverage':'Daily browser captures of '+', '.join(urls)+'. Fresh desktop Chromium; no sign-in or consent interaction.',
+        'capture_urls':urls,'sources':[{'name':'CoolCode browser capture','url':'https://github.com/jsdyer/scanreceipt',
+            'status':'captured directly','detail':'Our own Chromium screenshots and network observations; independent of urlscan.'}],
+        'warnings':[]},root)
+
 if __name__=='__main__':
-    try:run()
-    except Exception as e:raise SystemExit('Collection stopped; previous data retained. '+str(e)) from None
+    try: run()
+    except Exception as e: raise SystemExit('Capture failed; previous deployment retained. '+str(e)) from None

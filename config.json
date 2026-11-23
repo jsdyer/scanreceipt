@@ -1,11 +1,8 @@
 {
-  "owned_domains": [
-    "coolcode.ca",
-    "jsdyer.github.io"
+  "capture_urls": [
+    "https://coolcode.ca/rackexpiry/",
+    "https://coolcode.ca/radarscope/",
+    "https://coolcode.ca/hotspotledger/"
   ],
-  "existing_public_scan_ids": [],
-  "publish_receipts": false,
-  "permission_note": "",
-  "maximum_results_per_domain": 5,
-  "search_days": 30
+  "urlscan_targets": ["https://coolcode.ca/", "https://jsdyer.github.io/"]
 }

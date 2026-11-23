@@ -2,6 +2,7 @@
 """Build a browser tool using Python's standard library; no network required."""
 from html import escape
 import json
+import hashlib
 from pathlib import Path
 import re
 import shutil
@@ -10,6 +11,18 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+
+
+def fingerprint_assets(stage, page):
+    for name in ['model.mjs', 'ui.mjs', 'app.mjs', 'style.css']:
+        path=stage/name
+        versioned=path.stem+'.'+hashlib.sha256(path.read_bytes()).hexdigest()[:16]+path.suffix
+        path.rename(stage/versioned)
+        for other in stage.glob('*.mjs'):
+            text=other.read_text();replaced=text.replace('./'+name,'./'+versioned)
+            if text!=replaced:other.write_text(replaced)
+        page=page.replace('./'+name,'./'+versioned)
+    return page
 
 
 def metadata(root=ROOT):
@@ -73,6 +86,7 @@ def build(root=ROOT):
             page = page.replace(placeholder, markup if on_coolcode else "")
         if re.search(r"\{\{[A-Z_]+\}\}", page):
             raise ValueError("Unresolved template placeholder in web/index.html")
+        page=fingerprint_assets(stage,page)
         index.write_text(page, encoding="utf-8")
         (stage / ".nojekyll").touch()
         from archive import assemble
