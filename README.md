@@ -60,3 +60,11 @@ The configured owner scope contains CoolCode, jsdyer.github.io, Liminal Hacker, 
 To add a future domain, edit `config.json`: add its hostname to `owned_hosts`. Add a URL to `capture_urls` only if it should be captured every day. `urlscan_targets` lists suggested URLs; a new target can always be entered in `custom_url` after its host is allowed. To add it to the visual dropdown too, append the URL under `.github/workflows/urlscan-check.yml` → `inputs.target.options`. No new API key is needed.
 
 The daily set remains Rack Expiry, Radar Scope and Hotspot Ledger. Blank `capture_url` runs that set now. A manual capture adds to the newest 30 retained receipts without changing the daily set. The archive retains older receipts and images. Only capture pages intended for public sharing; paths and screenshots are public.
+
+<!-- schedule-reliability -->
+## Schedule reliability
+
+Public GitHub repositories can have scheduled workflows disabled after 60 days of inactivity. A separate weekly [schedule guard](.github/workflows/schedule-guard.yml) calls GitHub's enable-workflow API for an explicit list of refresh workflows and itself. It can restore workflows disabled for inactivity, preserves manually disabled workflows, and runs independently of collection failures.
+
+This is an interim mitigation, not a scheduling guarantee: GitHub does not document active-workflow renewal as a permanent exemption, and scheduled runs can be delayed or dropped. A scheduler on our own Linux server is the planned independent trigger. The guard does not collect data, create dummy commits, or change source/check timestamps; successful collection and published data freshness still need monitoring.
+<!-- /schedule-reliability -->
